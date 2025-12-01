@@ -7,6 +7,7 @@ module.exports = {
     authenticate: async (req,res,next) => {
         try {
             const header = req.headers.authorization;
+            if(!header) return res.unauthorized('Missing authorization header');
             const token = header.startsWith('Bearer ') ? header.slice(7) : null;
             if(!token ) return res.unauthorized('Missing token');
 

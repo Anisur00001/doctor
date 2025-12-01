@@ -139,7 +139,7 @@ router.post('/doctor/register',
 
              res.redirect(redirectUrl)
         } catch (error) {
-        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=${encodeURIComponent(e.message)}`)
+        res.redirect(`${process.env.FRONTEND_URL}/auth/error?message=${encodeURIComponent(error.message)}`)
         }
     }
  )

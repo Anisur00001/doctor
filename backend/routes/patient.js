@@ -13,7 +13,7 @@ router.get(
   "/me",
   authenticate,
   requireRole("patient"), async (req, res) => {
-    const doc = await Patient.findById(req.user._id).select(
+    const doc = await Patient.findById(req.auth.id).select(
       "-password -googleId"
     );
     res.ok(doc, "Profile fetched");
@@ -47,7 +47,7 @@ router.put("/onboarding/update", authenticate, requireRole("patient"), [
          }
          delete updated.password;
          updated.isVerified = true; //Mark profile as verified on update
-         const doc = await Patient.findByIdAndUpdate(req.user._id,updated, {new:true}).select('-password -googleId');
+         const doc = await Patient.findByIdAndUpdate(req.auth.id,updated, {new:true}).select('-password -googleId');
          res.ok(doc, 'Profile updated')
     } catch (error) {
         res.serverError("updated failed", [error.message])

@@ -99,6 +99,20 @@ const PayementStep = ({
         );
       }
 
+      if (!orderResponse.data) {
+        throw new Error("Payment service unavailable");
+      }
+
+      if (orderResponse.data?.demoPayment) {
+        setPaymentStatus("success");
+        if (onPaymentSuccess) {
+          onPaymentSuccess(orderResponse.data.appointment);
+        } else {
+          onConfirm();
+        }
+        return;
+      }
+
       const { orderId, amount, currency, key } = orderResponse.data;
 
       //Configure Razorpay options

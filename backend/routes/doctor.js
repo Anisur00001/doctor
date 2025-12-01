@@ -90,7 +90,7 @@ router.get(
 
 //Get the profile of doctor
 router.get("/me", authenticate, requireRole("doctor"), async (req, res) => {
-  const doc = await Doctor.findById(req.user._id).select("-password -googleId");
+  const doc = await Doctor.findById(req.auth.id).select("-password -googleId");
   res.ok(doc, "Profile fetched");
 });
 
@@ -122,7 +122,7 @@ router.put(
       const updated = { ...req.body };
       delete updated.password;
       updated.isVerified = true; //Mark profile as verified on update
-      const doc = await Doctor.findByIdAndUpdate(req.user._id, updated, {
+      const doc = await Doctor.findByIdAndUpdate(req.auth.id, updated, {
         new: true,
       }).select("-password -googleId");
       res.ok(doc, "Profile updated");
@@ -207,7 +207,7 @@ router.get(
       });
 
       const totalRevenue = totalAppointment.reduce(
-        (sum, apt) => sum + (apt.fees || doctor.fees || 0),
+        (sum, apt) => sum + (apt.consultationFees || doctor.fees || 0),
         0
       );
 

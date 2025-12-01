@@ -38,7 +38,7 @@ router.get(
       res.ok(appointment, "Appointment fetched successfully");
     } catch (error) {
       console.error("Doctor appointment fetch error", error);
-      res, serverError("Failed to fetch appointment", [error.message]);
+      res.serverError("Failed to fetch appointment", [error.message]);
     }
   }
 );
@@ -77,7 +77,7 @@ router.get(
       res.ok(appointment, "Appointment fetched successfully");
     } catch (error) {
       console.error("Patient appointment fetch error", error);
-      res, serverError("Failed to fetch appointment", [error.message]);
+      res.serverError("Failed to fetch appointment", [error.message]);
     }
   }
 );
@@ -101,7 +101,7 @@ router.get("/booked-slots/:doctorId/:date", async (req, res) => {
 
     res.ok(bookedSlot, "Booked slot retrieved");
   } catch (error) {
-    res, serverError("Failed to fetch booked slot", [error.message]);
+    res.serverError("Failed to fetch booked slot", [error.message]);
   }
 });
 
@@ -121,7 +121,6 @@ router.post("/book", authenticate, requireRole("patient"), [
     .withMessage("consultationFees is required"),
   body("platformFees").isNumeric().withMessage("platformFees is required"),
   body("totalAmount").isNumeric().withMessage("totalAmount is required"),
-  ,
   validate,
 
   async (req, res) => {
@@ -186,7 +185,7 @@ router.post("/book", authenticate, requireRole("patient"), [
       res.created(appointment, "Appointment booked successfully");
     } catch (error) {
       console.error("Book appointment error", error);
-      res, serverError("Failed to book appointment", [error.message]);
+      res.serverError("Failed to book appointment", [error.message]);
     }
   },
 ]);
@@ -211,7 +210,7 @@ router.get("/join/:id", authenticate, async (req, res) => {
     );
   } catch (error) {
     console.error("Join consultation error", error);
-    res, serverError("Failed to Join consultation", [error.message]);
+    res.serverError("Failed to Join consultation", [error.message]);
   }
 });
 
@@ -237,7 +236,7 @@ router.put("/end/:id", authenticate, async (req, res) => {
     res.ok(appointment, "Consultation completed successfully");
   } catch (error) {
     console.error("End consultation error", error);
-    res, serverError("Failed to End consultation", [error.message]);
+    res.serverError("Failed to End consultation", [error.message]);
   }
 });
 
@@ -268,7 +267,7 @@ router.put(
       res.ok(appointment, "Appointment status updated successfully");
     } catch (error) {
       console.error("updated Appointment status error", error);
-      res, serverError("Failed to updated Appointment status", [error.message]);
+      res.serverError("Failed to updated Appointment status", [error.message]);
     }
   }
 );
@@ -307,7 +306,7 @@ router.get("/:id", authenticate, async (req, res) => {
     res.ok({ appointment }, "Appointment fetched successfully");
   } catch (error) {
     console.error("Get appointment error", error);
-    res, serverError("Failed to Get appointment", [error.message]);
+    res.serverError("Failed to Get appointment", [error.message]);
   }
 });
 

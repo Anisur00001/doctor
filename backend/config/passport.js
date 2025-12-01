@@ -5,15 +5,17 @@ const Doctor = require("../modal/Doctor");
 
 require("dotenv").config();
 
-passport.use(
-  "google",
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL,
-      passReqToCallback: true,
-    },
+// Only configure Google strategy if credentials are provided (skip in test)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.NODE_ENV !== 'test') {
+  passport.use(
+    "google",
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL,
+        passReqToCallback: true,
+      },
 
     async (req, accessToken, refreshToken, profile, done) => {
       try {
@@ -67,7 +69,8 @@ passport.use(
       }
     }
   )
-);
+  );
+}
 
 
 module.exports = passport;

@@ -1,4 +1,9 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
+// Validate BASE_URL is set
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  console.warn('⚠️ NEXT_PUBLIC_API_URL is not set. Using default: http://localhost:8000/api');
+}
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -48,10 +53,40 @@ class HttpService {
         }
 
         const response = await fetch(url, config);
-        const data : ApiResponse <T> = await response.json();
+        
+        // Get content type to determine how to parse response
+        const contentType = response.headers.get("content-type") || "";
+        const isJson = contentType.includes("application/json");
+        
+        // Check if response is OK before parsing
         if(!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`)
+          // Read response as text first (can be parsed as JSON later if needed)
+          const responseText = await response.text();
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          
+          // Try to parse as JSON if content-type suggests it, otherwise use text
+          if (isJson) {
+            try {
+              const errorData = JSON.parse(responseText);
+              errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch (parseError) {
+              // If JSON parsing fails, use text response
+              errorMessage = responseText || errorMessage;
+            }
+          } else {
+            errorMessage = responseText || errorMessage;
+          }
+          
+          throw new Error(errorMessage);
         }
+        
+        // For successful responses, ensure we have JSON
+        if (!isJson) {
+          const text = await response.text();
+          throw new Error(`Expected JSON response but received ${contentType || 'unknown content type'}. Response: ${text.substring(0, 100)}`);
+        }
+        
+        const data : ApiResponse <T> = await response.json();
         return data;
     } catch (error:any) {
         console.error(`Api Error [${method} ${endPoint} ]:`, error)

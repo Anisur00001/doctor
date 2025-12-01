@@ -33,13 +33,13 @@ export const userAuthStore = create<AuthState>()(
     isAuthenticated: false,
 
     setUser: (user, token) => {
+      localStorage.setItem('token', token);
       set({
         user,
         token,
         isAuthenticated: true,
         error: null,
       });
-      localStorage.setItem('token',token);
     },
     clearError: () => set({ error: null }),
 
@@ -151,6 +151,12 @@ export const userAuthStore = create<AuthState>()(
         user:state.user,
         token:state.token,
         isAuthenticated:state.isAuthenticated
-    })
+    }),
+    onRehydrateStorage: () => (state) => {
+      // Sync token to localStorage when store is rehydrated
+      if (state?.token) {
+        localStorage.setItem('token', state.token);
+      }
+    }
    })
 );

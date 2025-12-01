@@ -8,10 +8,75 @@ const crypto = require("crypto");
 
 const router = express.Router();
 
-const razorPay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Demo mode flag allows simulating successful payments without Razorpay
+const isDemoPaymentMode = process.env.DEMO_PAYMENT_MODE === "true";
+
+// Initialize Razorpay only if credentials are available and demo mode is disabled
+let razorPay = null;
+const hasRazorpayCredentials =
+  process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET;
+
+if (!isDemoPaymentMode && hasRazorpayCredentials) {
+  try {
+    razorPay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+    console.log("✓ Razorpay initialized successfully");
+  } catch (error) {
+    console.error("✗ Failed to initialize Razorpay:", error.message);
+  }
+} else if (!hasRazorpayCredentials) {
+  console.warn(
+    "⚠ Razorpay credentials not found. Falling back to demo payment mode."
+  );
+  console.warn(
+    "   Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your .env file to enable live payments."
+  );
+}
+
+if (isDemoPaymentMode) {
+  console.info(
+    "ℹ Demo payment mode enabled. No real transactions will be created."
+  );
+}
+
+const shouldUseDemoPayments = isDemoPaymentMode || !razorPay;
+
+const populateAppointmentRelations = async (appointment) => {
+  await appointment.populate(
+    "doctorId",
+    "name specialization fees hospitalInfo profileImage"
+  );
+  await appointment.populate(
+    "patientId",
+    "name email phone profileImage"
+  );
+  return appointment;
+};
+
+const markAppointmentAsPaid = async (
+  appointment,
+  {
+    paymentMethod = "Demo",
+    orderId,
+    paymentId,
+    signature,
+    paymentDate = new Date(),
+  }
+) => {
+  appointment.paymentStatus = "Paid";
+  appointment.paymentMethod = paymentMethod;
+  appointment.razorpayPaymentId = paymentId;
+  appointment.razorpayOrderId = orderId;
+  appointment.razorpaySignature = signature;
+  appointment.paymentDate = paymentDate;
+
+  await appointment.save();
+  await populateAppointmentRelations(appointment);
+
+  return appointment;
+};
 
 router.post(
   "/create-order",
@@ -20,7 +85,7 @@ router.post(
   [
     body("appointmentId")
       .isMongoId()
-      .withMessage("valid appoitment ID is required"),
+      .withMessage("valid appointment ID is required"),
   ],
   validate,
   async (req, res) => {
@@ -33,20 +98,54 @@ router.post(
         .populate("patientId", "name email phone");
 
       if (!appointment) {
-        return res.notFound("Appointemnt not found");
+        return res.notFound("Appointment not found");
       }
+
+      if (!appointment.patientId || !appointment.doctorId) {
+        return res.serverError("Appointment data is incomplete", ["Missing patient or doctor information"]);
+      }
+
       if (appointment.patientId._id.toString() !== req.auth.id) {
-        return res.forbidden("Access denined");
+        return res.forbidden("Access denied");
       }
 
       if (appointment.paymentStatus === "Paid") {
-        return res.badRequest("Payment alredy complted");
+        return res.badRequest("Payment already completed");
+      }
+
+      if (!appointment.totalAmount || appointment.totalAmount <= 0) {
+        return res.badRequest("Invalid appointment amount");
+      }
+
+      // Demo payment flow (used when Razorpay is disabled or demo mode is on)
+      if (shouldUseDemoPayments) {
+        const demoOrderId = `demo_order_${appointmentId}_${Date.now()}`;
+        const demoPaymentId = `demo_payment_${Date.now()}`;
+        const confirmedAppointment = await markAppointmentAsPaid(appointment, {
+          paymentMethod: isDemoPaymentMode ? "Demo" : "Offline (Demo Fallback)",
+          orderId: demoOrderId,
+          paymentId: demoPaymentId,
+          signature: "demo_signature",
+        });
+
+        return res.ok(
+          {
+            demoPayment: true,
+            appointment: confirmedAppointment,
+          },
+          "Demo payment completed. Appointment confirmed successfully."
+        );
+      }
+
+      // Check if Razorpay is configured
+      if (!razorPay) {
+        return res.serverError("Payment gateway not configured", ["Razorpay credentials are missing"]);
       }
 
       const order = await razorPay.orders.create({
         amount: appointment.totalAmount * 100,
         currency: "INR",
-        receipt: `appointement_${appointmentId}`,
+        receipt: `appointment_${appointmentId}`,
         notes: {
           appointmentId: appointmentId,
           doctorName: appointment.doctorId.name,
@@ -68,7 +167,32 @@ router.post(
         "Payment order created successfully"
       );
     } catch (error) {
-      res.serverError("Failed to create paymnet order ", [error.message]);
+      console.error("Create payment order error:", error);
+      
+      // Handle Razorpay specific errors
+      if (error.statusCode === 401 || (error.error && error.error.code === 'BAD_REQUEST_ERROR')) {
+        return res.serverError(
+          "Razorpay authentication failed", 
+          [
+            "Invalid Razorpay credentials. Please check your RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the .env file.",
+            "Make sure you're using the correct test/live keys from your Razorpay dashboard.",
+            error.error?.description || error.message
+          ]
+        );
+      }
+      
+      if (error.statusCode === 400) {
+        return res.badRequest(
+          "Invalid payment request",
+          [error.error?.description || error.message]
+        );
+      }
+
+      // Generic error
+      res.serverError(
+        "Failed to create payment order", 
+        [error.error?.description || error.message || "Unknown error occurred"]
+      );
     }
   }
 );
@@ -80,7 +204,7 @@ router.post(
   [
     body("appointmentId")
       .isMongoId()
-      .withMessage("valid appoitment ID is required"),
+      .withMessage("valid appointment ID is required"),
     body("razorpay_order_id")
       .isString()
       .withMessage("Razorpay order Id required"),
@@ -107,13 +231,23 @@ router.post(
         .populate("patientId", "name email phone");
 
       if (!appointment) {
-        return res.notFound("Appointemnt not found");
-      }
-      if (appointment.patientId._id.toString() !== req.auth.id) {
-        return res.forbidden("Access denined");
+        return res.notFound("Appointment not found");
       }
 
-      //verify paymnet signature
+      if (!appointment.patientId || !appointment.doctorId) {
+        return res.serverError("Appointment data is incomplete", ["Missing patient or doctor information"]);
+      }
+
+      if (appointment.patientId._id.toString() !== req.auth.id) {
+        return res.forbidden("Access denied");
+      }
+
+      // Check if Razorpay is configured
+      if (!process.env.RAZORPAY_KEY_SECRET) {
+        return res.serverError("Payment gateway not configured", ["Razorpay key secret is missing"]);
+      }
+
+      //verify payment signature
       const body = razorpay_order_id + "|" + razorpay_payment_id;
       const expectedSignature = crypto
         .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -122,30 +256,23 @@ router.post(
 
       const isAuthentic = expectedSignature === razorpay_signature;
       if (!isAuthentic) {
-        return res.badRequest("paymnet varification failed");
+        return res.badRequest("Payment verification failed");
       }
 
-      appointment.paymentStatus = "Paid";
-      appointment.paymentMethod = "RazorPay";
-      appointment.razorpayPaymentId = razorpay_payment_id;
-      appointment.razorpayOrderId = razorpay_order_id;
-      appointment.razorpaySignature = razorpay_signature;
-      appointment.paymentDate = new Date();
-
-      await appointment.save();
-
-      await appointment.populate(
-        "doctorId",
-        "name specialization fees hospitalInfo profileImage"
-      );
-      await appointment.populate("patientId", "name email phone profileImage");
+      const confirmedAppointment = await markAppointmentAsPaid(appointment, {
+        paymentMethod: "RazorPay",
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+        signature: razorpay_signature,
+      });
 
       res.ok(
-        appointment,
-        "Payment verified and appointment confirmed succesfully"
+        confirmedAppointment,
+        "Payment verified and appointment confirmed successfully"
       );
     } catch (error) {
-      res.serverError("Failed to verify paymnet ", [error.message]);
+      console.error("Verify payment error:", error);
+      res.serverError("Failed to verify payment", [error.message]);
     }
   }
 );
