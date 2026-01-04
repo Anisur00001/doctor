@@ -584,7 +584,7 @@ git push --force-with-lease
 | Component | Version | Notes |
 |-----------|---------|-------|
 | Node.js | 18.x or 20.x | LTS versions recommended |
-| Next.js | 15.5.2 | Latest stable |
+| Next.js | 16.1.1 | Latest stable with security fixes |
 | React | 19.1.0 | Latest stable |
 | MongoDB | 4.4+ | Atlas recommended |
 | Vercel CLI | Latest | For local development |
@@ -592,7 +592,7 @@ git push --force-with-lease
 ### Dependency Compatibility Matrix
 
 #### Frontend Dependencies
-- **React 19.1.0** ✅ Compatible with Next.js 15.5.2
+- **React 19.1.0** ✅ Compatible with Next.js 16.1.1
 - **TypeScript 5.x** ✅ Full Next.js support
 - **Tailwind CSS 4.x** ✅ Latest version
 - **Radix UI** ✅ React 19 compatible
