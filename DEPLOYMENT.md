@@ -61,12 +61,11 @@ The frontend is already configured with the following `vercel.json`:
 
 ```json
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/.next",
-  "devCommand": "cd frontend && npm run dev",
-  "installCommand": "cd frontend && npm install",
-  "framework": "nextjs",
-  "rootDirectory": "frontend"
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs"
 }
 ```
 
@@ -83,7 +82,7 @@ The frontend is already configured with the following `vercel.json`:
 
 3. **Configure Build Settings**
    - **Framework Preset**: Next.js
-   - **Root Directory**: `frontend`
+   - **Root Directory**: `frontend` (select this when importing)
    - **Build Command**: `npm run build`
    - **Output Directory**: `.next`
    - **Install Command**: `npm install`
